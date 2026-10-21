@@ -5,7 +5,7 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 
 const SYSTEM = `You are a senior technical editor auditing a single blog post from the Highcharts blog (highcharts.com/blog). Highcharts is a JavaScript charting library by Highsoft (products: Highcharts Core, Stock, Maps, Gantt, Dashboards, Grid, Orbit).
 
-You receive the post's own body HTML (WordPress content only, nothing from the page template). Audit it across four axes and submit the result with the submit_review tool (its input schema is the output contract described below).
+You receive the post's own body HTML (WordPress content only, nothing from the page template). Audit it across four axes and return ONE JSON object matching the output contract below, no prose before or after it.
 
 AXES
 1. Technical correctness: broken/deprecated Highcharts API usage, old call patterns, wrong code, references to removed features, malformed markup inside the body.
@@ -59,46 +59,44 @@ OUTPUT (strict JSON)
 }`;
 
 
-const REVIEW_TOOL: Anthropic.Tool = {
-  name: "submit_review",
-  description: "Submit the editorial audit of the blog post. Always call this exactly once.",
-  input_schema: {
+const REVIEW_SCHEMA: Record<string, unknown> = {
     type: "object",
     required: ["summary", "overall_severity", "historical", "aeo_score", "issues", "aeo", "suggested_content_html"],
     properties: {
       summary: { type: "string" },
       overall_severity: { type: "string", enum: ["ok", "minor", "major", "blocker"] },
       historical: { type: "boolean" },
-      aeo_score: { type: "integer", minimum: 0, maximum: 100 },
+      aeo_score: { type: "integer", description: "0-100" },
       issues: {
         type: "array",
         items: {
           type: "object",
+          additionalProperties: false,
           required: ["category", "severity", "title", "description", "original_snippet", "suggested_snippet", "apply_mode"],
           properties: {
             category: { type: "string", enum: ["deprecated-api", "broken-code", "code-format", "outdated-version", "broken-link", "structure", "schema", "aeo", "style", "a11y", "clarity", "needs-context-note"] },
             severity: { type: "string", enum: ["info", "minor", "major", "blocker"] },
             title: { type: "string" },
             description: { type: "string" },
-            original_snippet: { type: ["string", "null"], description: "Exact substring of the input HTML, or null for insertions" },
-            suggested_snippet: { type: ["string", "null"] },
+            original_snippet: { anyOf: [{ type: "string" }, { type: "null" }], description: "Exact substring of the input HTML, or null for insertions" },
+            suggested_snippet: { anyOf: [{ type: "string" }, { type: "null" }] },
             apply_mode: { type: "string", enum: ["replace", "prepend", "append", "none"] },
           },
         },
       },
       aeo: {
         type: "object",
+        additionalProperties: false,
         required: ["lead_answer", "suggested_headings", "faq", "schema_jsonld"],
         properties: {
-          lead_answer: { type: ["string", "null"] },
+          lead_answer: { anyOf: [{ type: "string" }, { type: "null" }] },
           suggested_headings: { type: "array", items: { type: "string" } },
-          faq: { type: "array", items: { type: "object", required: ["q", "a"], properties: { q: { type: "string" }, a: { type: "string" } } } },
-          schema_jsonld: { type: ["string", "null"] },
+          faq: { type: "array", items: { type: "object", additionalProperties: false, required: ["q", "a"], properties: { q: { type: "string" }, a: { type: "string" } } } },
+          schema_jsonld: { anyOf: [{ type: "string" }, { type: "null" }] },
         },
       },
       suggested_content_html: { type: "string", description: "Full improved body HTML, or the original unchanged" },
     },
-  },
 };
 
 export interface LlmReview {
@@ -164,22 +162,15 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
       max_tokens: 32000,
       system: SYSTEM,
       messages: [{ role: "user", content: user }],
-      tools: [REVIEW_TOOL],
-      tool_choice: { type: "tool", name: REVIEW_TOOL.name },
+      output_config: { format: { type: "json_schema", schema: REVIEW_SCHEMA } },
     })
     .finalMessage();
 
-  const toolUse = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === REVIEW_TOOL.name);
-  let review: LlmReview;
-  if (toolUse) {
-    review = toolUse.input as LlmReview;
-  } else {
-    const text = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-    review = parseReview(text);
-  }
+  const text = res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+  const review = parseReview(text);
   if (res.stop_reason === "max_tokens") throw new Error("Editorial review was cut off (max_tokens). Try again or shorten the post.");
   review.issues = Array.isArray(review.issues) ? review.issues : [];
   review.aeo = review.aeo ?? { lead_answer: null, suggested_headings: [], faq: [], schema_jsonld: null };

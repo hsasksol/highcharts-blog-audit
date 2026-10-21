@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AXES, DEFAULT_AGE_WARNING, type Axis, type Decision, type Issue, type Post, type PostState } from "@/lib/types";
 import { AeoScore, DecisionBadge, SeverityBadge, StateBadge } from "./Badges";
+import { Steps } from "./Steps";
 
 interface Props {
   post: Post;
@@ -34,6 +35,9 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
     return m;
   }, [issues]);
   const decided = issues.filter((i) => i.decision !== "pending").length;
+  const allDecided = audited && issues.length > 0 && decided === issues.length;
+  const stepDone = [audited, allDecided, post.age_warning || allDecided, false];
+  const currentStep: 1 | 2 | 3 | 4 = !audited ? 1 : !allDecided ? 2 : !post.age_warning && suggestAgeWarning ? 3 : 4;
 
   async function patchPost(body: Record<string, unknown>) {
     const res = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -176,14 +180,15 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
               HTML
             </button>
           </div>
-          <button onClick={() => copyHtml("audited")} className="rounded-hc border border-success-600 bg-success-600 px-3 py-1.5 font-medium text-white hover:bg-success-700 disabled:opacity-50">
+          <button onClick={() => copyHtml("audited")} title="Step 4: paste this into the WordPress code editor" className="rounded-hc border border-success-600 bg-success-600 px-3 py-1.5 font-medium text-white hover:bg-success-700 disabled:opacity-50">
             Copy audited HTML
           </button>
-          <button onClick={runAudit} disabled={!!busy} className="rounded-hc bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          <button onClick={runAudit} disabled={!!busy} title="Step 1" className="rounded-hc bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
             {busy === "audit" ? "Auditing…" : audited ? "Re-run audit" : "Run audit"}
           </button>
         </div>
       </div>
+      <Steps current={currentStep} done={stepDone} />
       {msg && <div className="rounded-hc border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700">{msg}</div>}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
@@ -282,7 +287,7 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
             <label className="flex cursor-pointer items-start gap-2">
               <input type="checkbox" className="mt-1" checked={post.age_warning} disabled={busy === "age"} onChange={(e) => toggleAgeWarning(e.target.checked)} />
               <span>
-                <span className="font-semibold">Add age warning box at the top of the post</span>
+                <span className="font-semibold"><span className="mr-1 text-neutral-400">Step 3</span>Add age warning box at the top of the post</span>
                 {suggestAgeWarning && !post.age_warning && <span className="ml-2 rounded-hc bg-attention-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase text-attention-800">post is 5+ years old</span>}
                 <span className="block text-xs text-neutral-500">Inserted into the audited HTML you copy into WordPress.</span>
               </span>
@@ -297,6 +302,11 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
           </section>
 
           {/* Issues by axis */}
+          {audited && (
+            <p className="px-1 text-xs text-neutral-500">
+              <span className="font-semibold text-neutral-700">Step 2</span> Open each issue below and choose Accept audit, Reject or Needs changes. Accepted changes appear in “See audited page”.
+            </p>
+          )}
           {audited &&
             ([1, 2, 3, 4] as Axis[]).map((axis) => (
               <section key={axis} className="rounded-hc border border-neutral-200 bg-white p-4">

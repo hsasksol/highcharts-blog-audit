@@ -63,6 +63,7 @@ export interface Post {
   word_count: number;
   original_html: string;
   original_text: string | null;
+  existing_jsonld: Record<string, unknown>[] | null;
   fetched_at: string;
   audit_status: AuditStatus;
   audit_error: string | null;

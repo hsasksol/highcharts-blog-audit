@@ -58,6 +58,23 @@ export function Toolbar({ pendingCount }: { pendingCount: number }) {
     }
   }
 
+  async function resetAll() {
+    const typed = window.prompt("This deletes every post, issue and decision in the tool (not on the blog). Type RESET to confirm.");
+    if (typed !== "RESET") return;
+    setBusy("reset");
+    try {
+      const res = await fetch("/api/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: "RESET" }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? res.statusText);
+      setLog("Reset done. Click “Sync posts”.");
+      router.refresh();
+    } catch (e) {
+      setLog(`Reset failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <button onClick={sync} disabled={!!busy} className="rounded-hc border border-neutral-300 bg-white px-3 py-1.5 font-medium hover:bg-neutral-50 disabled:opacity-50">
@@ -69,6 +86,9 @@ export function Toolbar({ pendingCount }: { pendingCount: number }) {
         </button>
         <input type="number" min={1} max={100} value={batch} onChange={(e) => setBatch(Math.max(1, Number(e.target.value)))} className="w-16 rounded-hc border border-neutral-300 px-2 py-1.5" />
       </div>
+      <button onClick={resetAll} disabled={!!busy} className="rounded-hc border border-danger-300 bg-white px-2 py-1.5 text-xs font-medium text-danger-700 hover:bg-danger-50 disabled:opacity-50" title="Delete all audit data in the tool and start over">
+        Reset all
+      </button>
       {log && <span className="text-neutral-500">{log}</span>}
     </div>
   );

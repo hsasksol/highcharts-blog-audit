@@ -1,6 +1,7 @@
 import { db } from "./supabase";
 import { runRules } from "./rules";
 import { reviewPost, reviewToIssues } from "./llm";
+import { fetchPageMeta } from "./wordpress";
 import { DEFAULT_AGE_WARNING, SEVERITY_RANK, type Issue, type NewIssue, type Post, type PostState, type Severity } from "./types";
 
 const FIVE_YEARS_MS = 5 * 365.25 * 24 * 3600 * 1000;
@@ -24,6 +25,11 @@ export async function auditPost(postId: number, opts: { llm?: boolean } = {}): P
     let patch: Partial<Post> = {};
 
     if (useLlm) {
+      if (!post.existing_jsonld) {
+        const meta = await fetchPageMeta(post.url);
+        post.existing_jsonld = meta.jsonld;
+        await db().from("posts").update({ existing_jsonld: meta.jsonld }).eq("id", postId);
+      }
       const review = await reviewPost(post);
       llmIssues = reviewToIssues(review, post.original_html);
       patch = {

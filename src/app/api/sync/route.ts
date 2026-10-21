@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
-import { fetchAllWpPosts, fetchDisplayAuthor, fetchSitemapPostUrls, normalizeWpPost } from "@/lib/wordpress";
+import { fetchAllWpPosts, fetchPageMeta, fetchSitemapPostUrls, normalizeWpPost } from "@/lib/wordpress";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing } = await db()
     .from("posts")
-    .select("id, modified_at, author_name")
+    .select("id, modified_at, author_name, existing_jsonld")
     .in("id", ids.length ? ids : [-1]);
   const existingMap = new Map((existing ?? []).map((e) => [e.id as number, e]));
 
@@ -36,12 +36,20 @@ export async function POST(req: NextRequest) {
   for (const raw of slice) {
     const prev = existingMap.get(raw.id);
     const modified = `${raw.modified_gmt}Z`;
-    if (prev && prev.modified_at && new Date(prev.modified_at).getTime() === new Date(modified).getTime() && prev.author_name) {
+    const unchangedContent = Boolean(prev && prev.modified_at && new Date(prev.modified_at).getTime() === new Date(modified).getTime() && prev.author_name);
+    if (unchangedContent && prev?.existing_jsonld) {
       unchanged += 1;
       continue;
     }
-    const displayAuthor = prev?.author_name ?? (await fetchDisplayAuthor(raw.link));
-    const row = normalizeWpPost(raw, displayAuthor);
+    if (unchangedContent && prev) {
+      // Content unchanged, only backfill the page's JSON-LD.
+      const meta = await fetchPageMeta(raw.link);
+      await db().from("posts").update({ existing_jsonld: meta.jsonld }).eq("id", raw.id);
+      unchanged += 1;
+      continue;
+    }
+    const meta = await fetchPageMeta(raw.link);
+    const row = { ...normalizeWpPost(raw, meta.author ?? prev?.author_name ?? null), existing_jsonld: meta.jsonld };
     const payload = prev
       ? { ...row, fetched_at: new Date().toISOString(), audit_status: "pending" }
       : { ...row, fetched_at: new Date().toISOString() };

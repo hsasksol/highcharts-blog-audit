@@ -65,32 +65,46 @@ export async function fetchWpPost(id: number): Promise<WpPostRaw> {
   return (await res.json()) as WpPostRaw;
 }
 
-/** Author display name as shown on the live page (JSON-LD), since the co-authors term only holds a username. */
-export async function fetchDisplayAuthor(pageUrl: string): Promise<string | null> {
+export interface PageMeta {
+  author: string | null;
+  /** All JSON-LD nodes on the live page (flattened @graph), as emitted by the site. */
+  jsonld: Record<string, unknown>[];
+}
+
+/** Live page metadata: author display name and the existing JSON-LD, both from the page's ld+json blocks. */
+export async function fetchPageMeta(pageUrl: string): Promise<PageMeta> {
+  const meta: PageMeta = { author: null, jsonld: [] };
   try {
     const res = await fetch(pageUrl, { headers: UA, cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) return meta;
     const html = await res.text();
     for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
       try {
         const data = JSON.parse(m[1]);
-        const graph: unknown[] = Array.isArray(data?.["@graph"]) ? data["@graph"] : [data];
+        const graph: unknown[] = Array.isArray(data?.["@graph"]) ? data["@graph"] : Array.isArray(data) ? data : [data];
         for (const node of graph as Record<string, unknown>[]) {
-          const t = node?.["@type"];
+          if (!node || typeof node !== "object") continue;
+          meta.jsonld.push(node);
+          const t = node["@type"];
           const types = Array.isArray(t) ? t : [t];
-          if (types.includes("Article") || types.includes("BlogPosting")) {
+          if (!meta.author && (types.includes("Article") || types.includes("BlogPosting"))) {
             const author = node.author as { name?: string } | undefined;
-            if (author?.name) return author.name;
+            if (author?.name) meta.author = author.name;
           }
         }
       } catch {
         /* ignore malformed block */
       }
     }
-    return null;
   } catch {
-    return null;
+    /* network error: leave empty */
   }
+  return meta;
+}
+
+/** @deprecated use fetchPageMeta */
+export async function fetchDisplayAuthor(pageUrl: string): Promise<string | null> {
+  return (await fetchPageMeta(pageUrl)).author;
 }
 
 export function decodeEntities(s: string): string {

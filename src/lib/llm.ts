@@ -18,7 +18,7 @@ AXES
    - Direct, factual, hedge-free sentences with specific numbers, versions and dates instead of vague or marketing language.
    - FAQ block: propose 3-6 likely follow-up questions with concise answers.
    - Lists, tables, numbered steps where the content is enumerable.
-   - Structured data: propose the right schema.org JSON-LD (Article plus FAQPage and/or HowTo when applicable) for the body content.
+   - Structured data: the live page ALREADY emits JSON-LD (Organization, WebSite, BreadcrumbList and an Article/BlogPosting node); you receive it in the user message. Never re-propose or duplicate those. Instead, propose only ADDITIONAL schema.org nodes that the body content actually supports, such as FAQPage (when the post has or you propose a Q&A block), HowTo (numbered, actionable steps), VideoObject (embedded video), SoftwareSourceCode (substantial code examples), Dataset or ItemList. Every node must be built from facts in the post (real questions, real steps, real headings), reuse the same @context, follow the existing @id conventions (e.g. "<post url>#faq", "<post url>#howto") and reference the existing article via "mainEntityOfPage"/"isPartOf" where it fits. If nothing in the content justifies a new node, set "schema_jsonld" to null. When you propose an FAQ block, the FAQPage node and the FAQ HTML must contain the same questions and answers.
    - Entity and definition clarity early in the post.
    - Trust signals and freshness: flag time-sensitive claims and stale version references.
    - Scannability: paragraphs of 2-4 sentences, descriptive link text, a short TL;DR for long posts.
@@ -53,7 +53,7 @@ OUTPUT (strict JSON)
     "lead_answer": "Proposed answer-first opening paragraph (plain HTML <p>), or null",
     "suggested_headings": ["Question-shaped heading", "..."],
     "faq": [ { "q": "...", "a": "..." } ],
-    "schema_jsonld": "JSON-LD string, or null"
+    "schema_jsonld": "JSON-LD string with ONLY additional nodes (FAQPage, HowTo, ...) that complement the existing page schema, or null"
   },
   "suggested_content_html": "Full improved body HTML"
 }`;
@@ -100,6 +100,18 @@ const REVIEW_SCHEMA: Record<string, unknown> = {
     },
 };
 
+/** Compact view of the page's JSON-LD for the prompt: keep types, ids and key fields, drop long bodies. */
+function summarizeJsonLd(nodes: Record<string, unknown>[]): Record<string, unknown>[] {
+  return nodes.map((n) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(n)) {
+      if (k === "articleBody" || k === "description") continue;
+      out[k] = typeof v === "string" && v.length > 300 ? `${v.slice(0, 300)}…` : v;
+    }
+    return out;
+  });
+}
+
 export interface LlmReview {
   summary: string;
   overall_severity: "ok" | Severity;
@@ -137,7 +149,7 @@ export function parseReview(text: string): LlmReview {
   throw new Error(`LLM returned non-JSON output: ${(lastErr as Error)?.message ?? "parse failed"}`);
 }
 
-export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name" | "category" | "published_at" | "modified_at" | "original_html">): Promise<LlmReview> {
+export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name" | "category" | "published_at" | "modified_at" | "original_html" | "existing_jsonld">): Promise<LlmReview> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
   // Keys that are not scoped to a workspace must send the workspace ID on every request.
@@ -151,6 +163,9 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
     `Category: ${post.category ?? "unknown"}`,
     `Published: ${post.published_at?.slice(0, 10) ?? "unknown"}  Last modified: ${post.modified_at?.slice(0, 10) ?? "unknown"}`,
     `Today: ${new Date().toISOString().slice(0, 10)}`,
+    "",
+    "EXISTING JSON-LD ON THE LIVE PAGE (already present, do not duplicate; propose only complementary nodes):",
+    JSON.stringify(summarizeJsonLd(post.existing_jsonld ?? []), null, 1),
     "",
     "BODY HTML:",
     post.original_html,
@@ -260,8 +275,8 @@ export function reviewToIssues(review: LlmReview, html: string): NewIssue[] {
       axis: 4,
       category: "schema",
       severity: "minor",
-      title: "Add schema.org JSON-LD for this post",
-      description: "Structured data makes the article, FAQ or how-to steps machine-readable. Appended as a script block at the end of the post content.",
+      title: "Add complementary schema.org JSON-LD (FAQPage / HowTo / ...)",
+      description: "Additional structured-data nodes that match the post content, alongside the Article, Organization and Breadcrumb schema the page already emits. Appended as a script block at the end of the post content.",
       original_snippet: null,
       suggested_snippet: json.startsWith("<script") ? json : `<script type="application/ld+json">\n${json}\n</script>`,
       apply_mode: "append",

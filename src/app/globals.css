@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+:root {
+  --hc-blue: #4f46e5;
+  --hc-ink: #1f2140;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Rendered WordPress post body (original or audited). */
+.post-body {
+  @apply text-[15px] leading-7 text-slate-800;
+}
+.post-body h1, .post-body h2 { @apply mt-8 mb-3 text-2xl font-bold text-slate-900; }
+.post-body h3 { @apply mt-6 mb-2 text-xl font-semibold text-slate-900; }
+.post-body h4 { @apply mt-5 mb-2 text-lg font-semibold; }
+.post-body p { @apply my-3; }
+.post-body ul { @apply my-3 list-disc pl-6; }
+.post-body ol { @apply my-3 list-decimal pl-6; }
+.post-body li { @apply my-1; }
+.post-body a { @apply text-indigo-700 underline; }
+.post-body pre { @apply my-4 overflow-x-auto rounded-md bg-slate-900 p-4 text-[13px] leading-6 text-slate-100; }
+.post-body code { @apply rounded bg-slate-100 px-1 py-0.5 text-[13px] text-pink-700; }
+.post-body pre code { @apply bg-transparent p-0 text-inherit; }
+.post-body img { @apply my-4 h-auto max-w-full rounded; }
+.post-body iframe { @apply my-4 w-full rounded border border-slate-200; }
+.post-body table { @apply my-4 w-full border-collapse text-sm; }
+.post-body th, .post-body td { @apply border border-slate-200 px-2 py-1 text-left align-top; }
+.post-body th { @apply bg-slate-100 font-semibold; }
+.post-body blockquote { @apply my-4 border-l-4 border-slate-300 pl-4 italic text-slate-600; }
+.post-body .hc-age-warning { @apply not-italic; }
+
+.snippet {
+  @apply max-h-40 overflow-auto whitespace-pre-wrap break-words rounded border px-2 py-1 font-mono text-[11.5px] leading-5;
+}

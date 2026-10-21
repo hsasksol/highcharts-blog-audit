@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { normalizeCodeBlocks } from "./rules";
+import { ensureBoilerplate, touchesBoilerplate } from "./boilerplate";
 import { CATEGORY_AXIS, type AeoArtifacts, type IssueCategory, type NewIssue, type Post, type Severity } from "./types";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
@@ -29,6 +30,7 @@ GUARDRAILS
 - Historical content (announcements, release notes, event recaps, "new in version X") is NOT modernized. Set "historical": true and add a single issue with category "needs-context-note" proposing a short context note. Do not rewrite announcements.
 - Every issue must be independently accept/reject-able and concrete: include the exact original substring from the HTML in "original_snippet" (copy it verbatim, including tags) and the exact replacement in "suggested_snippet". If an issue is an insertion (new lead paragraph, FAQ block, TL;DR), set "original_snippet" to null and put the full HTML to insert in "suggested_snippet", with "apply_mode" set to "prepend" or "append".
 - Never invent facts, numbers, versions or claims. AEO rewrites keep the meaning of the source.
+- STANDARD INTRO: many posts contain two intentional boilerplate paragraphs near the top ("With Highcharts for React, developers get first-class charting with hooks, TypeScript support, and optimized rendering out of the box. Highcharts also integrates with Angular, Vue, and Svelte, as well as server-side languages like Python, R, PHP, and Java, and mobile platforms including iOS and Android." and "To explore Highcharts further, visit the interactive demo pages ... API reference ... Highcharts products and features."). These are deliberate and must stay exactly as they are: never flag them as filler, marketing, off-topic or redundant, never rewrite or move them, and keep them verbatim (with their links) in "suggested_content_html". Do not add them to posts that lack them.
 - Keep iframes, images, demo embeds and code examples intact unless the issue is specifically about them.
 - Code blocks on this blog use one fixed format: <div class="hs-code-outer-container"><div class="hs-code-container neutral-50-light neutral-800-dark" tabindex="0" role="region" aria-label="Code block"><pre class="wp-block-code"><code>…escaped code…</code></pre>[copy button]</div></div>. The deterministic layer already converts non-standard <pre> blocks to it, so do not report that; never add language-* classes, never strip the wrapper or the copy button in your rewrite, and when you write new code examples in "suggested_content_html" use plain <pre class="wp-block-code"><code>…</code></pre> (the tool wraps it). Do flag code that is pasted as paragraphs, inline code that should be a block, and broken or outdated code.
 - Keep "suggested_content_html" as valid HTML in the same style as the input (plain WordPress HTML: p, h2, h3, ul, ol, pre, code, a, img, iframe, table). Apply all your issues to it. If nothing should change, return the original unchanged.
@@ -242,11 +244,14 @@ export function reviewToIssues(review: LlmReview, html: string): NewIssue[] {
     });
   }
 
-  // Drop model issues that carry no actionable snippet when a derived card covers them (e.g. "add schema" with null snippet).
+  // Drop model issues that carry no actionable snippet when a derived card covers them (e.g. "add schema" with null snippet),
+  // and any issue that touches the intentional standard intro paragraphs.
   for (let i = out.length - 1; i >= 0; i--) {
     const o = out[i];
     if (o.category === "schema" && !o.suggested_snippet) out.splice(i, 1);
+    else if (touchesBoilerplate(o.original_snippet)) out.splice(i, 1);
   }
+  if (review.suggested_content_html) review.suggested_content_html = ensureBoilerplate(html, review.suggested_content_html);
 
   const aeo = review.aeo;
   const titleOrSnippet = (o: NewIssue) => `${o.title} ${o.suggested_snippet ?? ""}`;

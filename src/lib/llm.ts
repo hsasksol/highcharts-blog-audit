@@ -61,6 +61,7 @@ OUTPUT (strict JSON)
 
 const REVIEW_SCHEMA: Record<string, unknown> = {
     type: "object",
+    additionalProperties: false,
     required: ["summary", "overall_severity", "historical", "aeo_score", "issues", "aeo", "suggested_content_html"],
     properties: {
       summary: { type: "string" },

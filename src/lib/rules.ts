@@ -191,38 +191,81 @@ const brokenLinks: Rule = async (html, $) => {
   return out;
 };
 
+/** Highsoft house format for code: wrapper + pre.wp-block-code > code + copy button (data-copy-code). */
+export const COPY_BUTTON_HTML =
+  '<div class="wp-block-highsoft-hs-button"><button type="button" class="hc-button hc-button--white hc-button--size-200" data-copy-code="true" aria-label="Copy"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" width="16" height="16"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 8V5.2c0-1.12 0-1.68.218-2.108a2 2 0 0 1 .874-.874C9.52 2 10.08 2 11.2 2h7.6c1.12 0 1.68 0 2.108.218a2 2 0 0 1 .874.874C22 3.52 22 4.08 22 5.2v7.6c0 1.12 0 1.68-.218 2.108a2 2 0 0 1-.874.874C20.48 16 19.92 16 18.8 16H16M5.2 22h7.6c1.12 0 1.68 0 2.108-.218a2 2 0 0 0 .874-.874C16 20.48 16 19.92 16 18.8v-7.6c0-1.12 0-1.68-.218-2.108a2 2 0 0 0-.874-.874C14.48 8 13.92 8 12.8 8H5.2c-1.12 0-1.68 0-2.108.218a2 2 0 0 0-.874.874C2 9.52 2 10.08 2 11.2v7.6c0 1.12 0 1.68.218 2.108a2 2 0 0 0 .874.874C3.52 22 4.08 22 5.2 22"></path></svg>Copy</button></div>';
+
+export function wrapCodeBlock(innerCodeHtml: string): string {
+  return (
+    '<div class="hs-code-outer-container"><div class="hs-code-container neutral-50-light neutral-800-dark" tabindex="0" role="region" aria-label="Code block">\n' +
+    `<pre class="wp-block-code"><code>${innerCodeHtml}</code></pre>\n` +
+    COPY_BUTTON_HTML +
+    "\n</div></div>"
+  );
+}
+
+/** Wrap any <pre> that is not already inside the house code container (used for LLM rewrites). */
+export function normalizeCodeBlocks(html: string): string {
+  if (!/<pre[\s>]/i.test(html)) return html;
+  const $ = cheerio.load(html, { xml: { xmlMode: false, decodeEntities: false } } as Parameters<typeof cheerio.load>[1], false);
+  $("pre").each((_, el) => {
+    const $pre = $(el);
+    if ($pre.closest(".hs-code-outer-container").length) return;
+    const code = $pre.children("code").first();
+    const inner = (code.length ? code.html() : $pre.html()) ?? "";
+    $pre.replaceWith(wrapCodeBlock(inner));
+  });
+  return $.html();
+}
+
+/** Every <pre> must use the house code-block format with a copy button. */
 const codeBlocks: Rule = (html, $) => {
   const out: NewIssue[] = [];
   $("pre").each((_, el) => {
-    const code = $(el).find("code").first();
-    const cls = `${$(el).attr("class") || ""} ${code.attr("class") || ""}`;
-    if (/language-|lang-|brush:/.test(cls)) return;
-    const body = (code.length ? code : $(el)).text();
-    if (body.trim().length < 20) return;
-    const guess = /Highcharts\.|function\s*\(|=>|const |let |var |\$\(/.test(body)
-      ? "javascript"
-      : /^\s*</.test(body)
-        ? "html"
-        : /^\s*[.#a-z-]+\s*\{/m.test(body)
-          ? "css"
-          : null;
-    const original = outer($, el, html);
-    let suggested: string | null = null;
-    if (original && guess) {
-      const existing = $(el).attr("class");
-      suggested = existing
-        ? original.replace(/^<pre([^>]*?)class="([^"]*)"/, `<pre$1class="$2 language-${guess}"`)
-        : original.replace(/^<pre/, `<pre class="language-${guess}"`);
-    }
+    const $pre = $(el);
+    const inStandard = $pre.closest(".hs-code-outer-container").length > 0;
+    const code = $pre.children("code").first();
+    const hasCopy = $pre.closest(".hs-code-outer-container").find("[data-copy-code]").length > 0;
+    if (inStandard && code.length && hasCopy && $pre.hasClass("wp-block-code")) return;
+
+    const inner = (code.length ? code.html() : $pre.html()) ?? "";
+    if (inner.trim().length === 0) return;
+    // If the block already sits in a wrapper (but is incomplete), replace the whole wrapper; otherwise replace the <pre>.
+    const target = inStandard ? ($pre.closest(".hs-code-outer-container").get(0) as Element) : el;
+    const original = outer($, target, html);
+    const suggested = wrapCodeBlock(inner);
+    const why = !inStandard
+      ? "Code blocks on the blog use the standard container with a Copy button (hs-code-outer-container + pre.wp-block-code > code). This block is plain <pre>, so readers cannot copy it with one click and it renders differently from the rest of the blog."
+      : "The code container is incomplete (missing <code>, the wp-block-code class or the Copy button). Replace it with the complete standard block.";
     out.push(
       issue({
         axis: 1,
         category: "code-format",
-        severity: "minor",
-        title: guess ? `Code block has no language hint (looks like ${guess})` : "Code block has no language hint",
-        description: "A `language-*` class enables syntax highlighting and tells answer engines what the snippet is.",
+        severity: "major",
+        title: inStandard ? "Complete the standard code block (copy button)" : "Convert code block to the standard copyable format",
+        description: why,
         original_snippet: original,
-        suggested_snippet: suggested && suggested !== original ? suggested : null,
+        suggested_snippet: original ? suggested : null,
+      })
+    );
+  });
+
+  // Code pasted as paragraphs (lines of code inside <p> with <br>) is not a code block at all.
+  $("p").each((_, el) => {
+    const t = $(el).text();
+    const lines = t.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 3) return;
+    const codey = lines.filter((l) => /[{};]\s*$|^(var|let|const|function|import|Highcharts\.|\$\(|<\/?[a-z]+)/.test(l)).length;
+    if (codey / lines.length < 0.6) return;
+    out.push(
+      issue({
+        axis: 1,
+        category: "code-format",
+        severity: "major",
+        title: "Code is pasted as a paragraph instead of a code block",
+        description: "These lines look like code but live in a <p>. Move them into the standard copyable code block so formatting, whitespace and the Copy button work.",
+        original_snippet: outer($, el, html),
+        suggested_snippet: null,
       })
     );
   });

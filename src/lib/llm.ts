@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { normalizeCodeBlocks } from "./rules";
 import { CATEGORY_AXIS, type AeoArtifacts, type IssueCategory, type NewIssue, type Post, type Severity } from "./types";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
@@ -29,6 +30,7 @@ GUARDRAILS
 - Every issue must be independently accept/reject-able and concrete: include the exact original substring from the HTML in "original_snippet" (copy it verbatim, including tags) and the exact replacement in "suggested_snippet". If an issue is an insertion (new lead paragraph, FAQ block, TL;DR), set "original_snippet" to null and put the full HTML to insert in "suggested_snippet", with "apply_mode" set to "prepend" or "append".
 - Never invent facts, numbers, versions or claims. AEO rewrites keep the meaning of the source.
 - Keep iframes, images, demo embeds and code examples intact unless the issue is specifically about them.
+- Code blocks on this blog use one fixed format: <div class="hs-code-outer-container"><div class="hs-code-container neutral-50-light neutral-800-dark" tabindex="0" role="region" aria-label="Code block"><pre class="wp-block-code"><code>…escaped code…</code></pre>[copy button]</div></div>. The deterministic layer already converts non-standard <pre> blocks to it, so do not report that; never add language-* classes, never strip the wrapper or the copy button in your rewrite, and when you write new code examples in "suggested_content_html" use plain <pre class="wp-block-code"><code>…</code></pre> (the tool wraps it). Do flag code that is pasted as paragraphs, inline code that should be a block, and broken or outdated code.
 - Keep "suggested_content_html" as valid HTML in the same style as the input (plain WordPress HTML: p, h2, h3, ul, ol, pre, code, a, img, iframe, table). Apply all your issues to it. If nothing should change, return the original unchanged.
 - Put structured data ONLY in "aeo.schema_jsonld" (never as an issue), the FAQ block ONLY in "aeo.faq" (never as an issue), and the lead paragraph ONLY in "aeo.lead_answer" (never as an issue); the tool turns each of those into its own card.
 - Limit to the 12 most valuable issues. Prefer major AEO and correctness findings over nitpicks; the deterministic layer already catches missing alt text, dead links, pinned CDN versions and heading-level skips, so do not repeat those.
@@ -314,7 +316,7 @@ export function reviewToIssues(review: LlmReview, html: string): NewIssue[] {
       title: "Accept the full suggested rewrite",
       description: "Replaces the whole post body with the editor's rewrite (all issues applied). When accepted, snippet-level decisions are ignored for the final HTML.",
       original_snippet: null,
-      suggested_snippet: review.suggested_content_html,
+      suggested_snippet: normalizeCodeBlocks(review.suggested_content_html),
       apply_mode: "replace",
     });
   }

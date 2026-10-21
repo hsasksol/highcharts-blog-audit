@@ -94,6 +94,12 @@ h1, h2, h3 {
 .post-body table { @apply my-5 w-full border-collapse text-sm; }
 .post-body th, .post-body td { @apply border border-neutral-100 px-2 py-1.5 text-left align-top; }
 .post-body th { @apply bg-neutral-50 font-semibold; }
+.post-body .hs-code-outer-container { @apply my-5; }
+.post-body .hs-code-container { @apply relative rounded-hc border border-neutral-100 bg-neutral-50; }
+.post-body .hs-code-container pre { @apply my-0 rounded-hc bg-transparent p-4 pr-24 text-neutral-900; }
+.post-body .hs-code-container code { @apply bg-transparent p-0 text-neutral-900; }
+.post-body .wp-block-highsoft-hs-button { @apply absolute right-2 top-2; }
+.post-body .hc-button { @apply inline-flex items-center gap-1 rounded-hc border border-neutral-200 bg-white px-2 py-1 text-xs font-semibold text-neutral-800 hover:bg-neutral-50; }
 .post-body blockquote { @apply my-5 border-l-4 border-brand-300 pl-4 italic text-neutral-600; }
 .post-body .hc-age-warning { @apply not-italic; }
 .post-body .hc-age-warning strong { @apply font-semibold; }

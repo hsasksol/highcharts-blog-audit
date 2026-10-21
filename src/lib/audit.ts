@@ -1,5 +1,5 @@
 import { db } from "./supabase";
-import { runRules } from "./rules";
+import { runRules, normalizeCodeBlocks } from "./rules";
 import { reviewPost, reviewToIssues } from "./llm";
 import { fetchPageMeta } from "./wordpress";
 import { DEFAULT_AGE_WARNING, SEVERITY_RANK, type Issue, type NewIssue, type Post, type PostState, type Severity } from "./types";
@@ -37,7 +37,7 @@ export async function auditPost(postId: number, opts: { llm?: boolean } = {}): P
         overall_severity: review.overall_severity ?? null,
         historical: Boolean(review.historical),
         aeo_score: Number.isFinite(review.aeo_score) ? Math.max(0, Math.min(100, Math.round(review.aeo_score))) : null,
-        suggested_html: review.suggested_content_html ?? null,
+        suggested_html: review.suggested_content_html ? normalizeCodeBlocks(review.suggested_content_html) : null,
         aeo: review.aeo ?? null,
       };
     }

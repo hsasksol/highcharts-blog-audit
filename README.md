@@ -24,7 +24,7 @@ Every finding is an independent card with the exact original snippet and the pro
 1. **Supabase**: create a project, open the SQL editor, run `supabase/schema.sql`.
 2. **Env**: copy `.env.example` to `.env.local` and fill in
    - `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Project settings → API)
-   - `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`)
+   - `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), and `ANTHROPIC_WORKSPACE_ID` if the key is not scoped to a workspace
    - `APP_USERNAME`, `APP_PASSWORD` (one shared login) and `JWT_SECRET` (random 32+ bytes, `openssl rand -base64 48`)
 3. **Run**: `npm install && npm run dev`
 4. **Vercel**: import the GitHub repo, add the same env vars, deploy. `/api/audit/[id]` declares `maxDuration = 300`; if your plan caps function duration lower, Vercel will clamp it (one post usually takes 30-90 s).

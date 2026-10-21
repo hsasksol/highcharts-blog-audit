@@ -98,7 +98,9 @@ export function parseReview(text: string): LlmReview {
 export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name" | "category" | "published_at" | "modified_at" | "original_html">): Promise<LlmReview> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
-  const client = new Anthropic({ apiKey });
+  // Keys that are not scoped to a workspace must send the workspace ID on every request.
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
+  const client = new Anthropic({ apiKey, defaultHeaders: workspaceId ? { "anthropic-workspace-id": workspaceId } : undefined });
 
   const user = [
     `Title: ${post.title}`,

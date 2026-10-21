@@ -117,7 +117,6 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
-    temperature: 0.2,
     system: SYSTEM,
     messages: [{ role: "user", content: user }],
   });

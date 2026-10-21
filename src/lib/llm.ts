@@ -157,14 +157,17 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
     post.original_html,
   ].join("\n");
 
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 32000,
-    system: SYSTEM,
-    messages: [{ role: "user", content: user }],
-    tools: [REVIEW_TOOL],
-    tool_choice: { type: "tool", name: REVIEW_TOOL.name },
-  });
+  // Streaming is required by the SDK for large max_tokens; we only need the final message.
+  const res = await client.messages
+    .stream({
+      model: MODEL,
+      max_tokens: 32000,
+      system: SYSTEM,
+      messages: [{ role: "user", content: user }],
+      tools: [REVIEW_TOOL],
+      tool_choice: { type: "tool", name: REVIEW_TOOL.name },
+    })
+    .finalMessage();
 
   const toolUse = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === REVIEW_TOOL.name);
   let review: LlmReview;

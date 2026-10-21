@@ -60,16 +60,16 @@ export function Toolbar({ pendingCount }: { pendingCount: number }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <button onClick={sync} disabled={!!busy} className="rounded border border-slate-300 bg-white px-3 py-1.5 font-medium hover:bg-slate-50 disabled:opacity-50">
+      <button onClick={sync} disabled={!!busy} className="rounded-hc border border-neutral-300 bg-white px-3 py-1.5 font-medium hover:bg-neutral-50 disabled:opacity-50">
         {busy === "sync" ? "Syncing…" : "Sync posts"}
       </button>
       <div className="flex items-center gap-1">
-        <button onClick={auditNext} disabled={!!busy || pendingCount === 0} className="rounded bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+        <button onClick={auditNext} disabled={!!busy || pendingCount === 0} className="rounded-hc bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
           {busy === "audit" ? "Auditing…" : "Audit next"}
         </button>
-        <input type="number" min={1} max={100} value={batch} onChange={(e) => setBatch(Math.max(1, Number(e.target.value)))} className="w-16 rounded border border-slate-300 px-2 py-1.5" />
+        <input type="number" min={1} max={100} value={batch} onChange={(e) => setBatch(Math.max(1, Number(e.target.value)))} className="w-16 rounded-hc border border-neutral-300 px-2 py-1.5" />
       </div>
-      {log && <span className="text-slate-500">{log}</span>}
+      {log && <span className="text-neutral-500">{log}</span>}
     </div>
   );
 }

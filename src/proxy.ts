@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { COOKIE, verifySession } from "@/lib/auth";
 
 /**
- * Optional shared-password gate. Set AUDIT_PASSWORD in the environment to enable it.
- * Uses HTTP Basic auth so it works for both the UI and the API routes.
+ * Login gate: one shared username + password (APP_USERNAME / APP_PASSWORD), signed HttpOnly
+ * session cookie (JWT_SECRET, 8 h). Pages redirect to /login, API routes answer 401.
  */
-export function proxy(req: NextRequest) {
-  const password = process.env.AUDIT_PASSWORD;
-  if (!password) return NextResponse.next();
+export async function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  if (pathname === "/login" || pathname === "/api/login") return NextResponse.next();
 
-  const header = req.headers.get("authorization") ?? "";
-  if (header.startsWith("Basic ")) {
-    try {
-      const decoded = atob(header.slice(6));
-      const given = decoded.slice(decoded.indexOf(":") + 1);
-      if (given === password) return NextResponse.next();
-    } catch {
-      /* fall through */
-    }
-  }
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Highcharts blog audit"' },
-  });
+  const user = await verifySession(req.cookies.get(COOKIE)?.value).catch(() => null);
+  if (user) return NextResponse.next();
+
+  if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const url = req.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = pathname !== "/" ? `?next=${encodeURIComponent(pathname + req.nextUrl.search)}` : "";
+  return NextResponse.redirect(url);
 }
 
 export const config = {

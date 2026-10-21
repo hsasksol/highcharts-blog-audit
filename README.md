@@ -4,6 +4,8 @@ Content + AEO audit of every live post on highcharts.com/blog. Pulls the posts, 
 
 Stack: Next.js (App Router) on Vercel, Supabase (Postgres), Anthropic API.
 
+Login: one shared username + password. `/api/login` compares in constant time and sets an HttpOnly, Secure, SameSite=Strict cookie with a signed JWT (8 h). `src/proxy.ts` redirects unauthenticated pages to `/login` and answers 401 on API routes. The Supabase service role key is only used server-side; the browser never receives any Supabase key.
+
 ## What it audits
 
 Only the post body (WordPress `content.rendered`). Nothing from the page template, header, sidebar or metadata is touched.
@@ -23,7 +25,7 @@ Every finding is an independent card with the exact original snippet and the pro
 2. **Env**: copy `.env.example` to `.env.local` and fill in
    - `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Project settings → API)
    - `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`)
-   - optional `AUDIT_PASSWORD` to put the whole tool behind a shared password (HTTP Basic auth)
+   - `APP_USERNAME`, `APP_PASSWORD` (one shared login) and `JWT_SECRET` (random 32+ bytes, `openssl rand -base64 48`)
 3. **Run**: `npm install && npm run dev`
 4. **Vercel**: import the GitHub repo, add the same env vars, deploy. `/api/audit/[id]` declares `maxDuration = 300`; if your plan caps function duration lower, Vercel will clamp it (one post usually takes 30-90 s).
 

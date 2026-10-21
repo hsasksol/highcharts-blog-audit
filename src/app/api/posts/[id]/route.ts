@@ -10,7 +10,8 @@ const STATES: PostState[] = ["pending", "in-review", "approved", "needs-changes"
 /**
  * PATCH /api/posts/:id
  * { age_warning?: boolean, age_warning_text?: string, state_override?: PostState | null,
- *   bulk?: "accept-all" | "reject-all" | "reopen-all", actor?: string }
+ *   bulk?: "accept-all" | "reject-all" | "reopen-all" | "revert-original", actor?: string }
+ * revert-original: all decisions back to pending, age warning off, state override cleared (original_html untouched).
  */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -19,7 +20,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     age_warning?: boolean;
     age_warning_text?: string;
     state_override?: PostState | null;
-    bulk?: "accept-all" | "reject-all" | "reopen-all";
+    bulk?: "accept-all" | "reject-all" | "reopen-all" | "revert-original";
     actor?: string;
   };
 
@@ -40,7 +41,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
   }
 
-  if (body.bulk) {
+  if (body.bulk === "revert-original") {
+    const { error } = await db().from("issues").update({ decision: "pending", decided_by: null, decided_at: null }).eq("post_id", postId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await db().from("posts").update({ age_warning: false, state_override: null }).eq("id", postId);
+    await db().from("decision_log").insert({ post_id: postId, action: "revert-original", actor: body.actor ?? null });
+  } else if (body.bulk) {
     const decision = body.bulk === "accept-all" ? "accepted" : body.bulk === "reject-all" ? "rejected" : "pending";
     const q = db().from("issues").update({ decision, decided_by: body.actor ?? null, decided_at: decision === "pending" ? null : new Date().toISOString() }).eq("post_id", postId);
     // Bulk accept/reject only touches pending issues and never the full-rewrite card.

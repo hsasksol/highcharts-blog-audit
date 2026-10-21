@@ -72,7 +72,7 @@ export async function auditPost(postId: number, opts: { llm?: boolean } = {}): P
 }
 
 export function ageWarningHtml(text: string): string {
-  return `<div class="hc-age-warning" style="border-left:4px solid #e0a800;background:#fff8e1;padding:12px 16px;margin:0 0 24px;border-radius:4px"><strong>Heads up:</strong> ${text}</div>`;
+  return `<div class="hc-age-warning" style="display:flex;gap:12px;align-items:flex-start;border:1px solid #fcd34d;border-left:6px solid #f59e0b;background:#fffbeb;color:#78350f;padding:14px 18px;margin:0 0 28px;border-radius:8px;font-size:15px;line-height:1.5"><span aria-hidden="true" style="font-weight:700;font-size:18px;line-height:1.2">!</span><span><strong>Heads up:</strong> ${text}</span></div>`;
 }
 
 /** Build final HTML: original with accepted changes applied (or the accepted full rewrite), plus the age warning box if enabled. */
@@ -124,7 +124,7 @@ export async function recomputePost(postId: number): Promise<Post> {
   if (!post) throw new Error("Post not found");
   const list = issues ?? [];
   const state = post.state_override ?? computeState(list, post.audit_status === "audited");
-  const final_html = post.audit_status === "audited" ? assembleFinalHtml(post, list) : null;
+  const final_html = assembleFinalHtml(post, list);
   const { data: updated } = await db()
     .from("posts")
     .update({ state, final_html, final_updated_at: new Date().toISOString() })

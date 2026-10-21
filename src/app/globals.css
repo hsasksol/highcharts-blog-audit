@@ -96,6 +96,7 @@ h1, h2, h3 {
 .post-body th { @apply bg-neutral-50 font-semibold; }
 .post-body blockquote { @apply my-5 border-l-4 border-brand-300 pl-4 italic text-neutral-600; }
 .post-body .hc-age-warning { @apply not-italic; }
+.post-body .hc-age-warning strong { @apply font-semibold; }
 
 .snippet {
   @apply max-h-40 overflow-auto whitespace-pre-wrap break-words rounded border px-2 py-1 font-mono text-[11.5px] leading-5;

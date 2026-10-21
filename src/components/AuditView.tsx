@@ -169,14 +169,14 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
             <button onClick={() => setView("original")} className={`px-3 py-1.5 ${view === "original" ? "bg-neutral-900 text-white" : "hover:bg-neutral-50"}`}>
               See original
             </button>
-            <button onClick={() => setView("audited")} className={`px-3 py-1.5 ${view === "audited" ? "bg-neutral-900 text-white" : "hover:bg-neutral-50"}`} disabled={!audited}>
+            <button onClick={() => setView("audited")} className={`px-3 py-1.5 ${view === "audited" ? "bg-neutral-900 text-white" : "hover:bg-neutral-50"}`}>
               See audited page
             </button>
             <button onClick={() => setView("html")} className={`px-3 py-1.5 ${view === "html" ? "bg-neutral-900 text-white" : "hover:bg-neutral-50"}`}>
               HTML
             </button>
           </div>
-          <button onClick={() => copyHtml("audited")} disabled={!audited} className="rounded-hc border border-success-600 bg-success-600 px-3 py-1.5 font-medium text-white hover:bg-success-700 disabled:opacity-50">
+          <button onClick={() => copyHtml("audited")} className="rounded-hc border border-success-600 bg-success-600 px-3 py-1.5 font-medium text-white hover:bg-success-700 disabled:opacity-50">
             Copy audited HTML
           </button>
           <button onClick={runAudit} disabled={!!busy} className="rounded-hc bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
@@ -193,7 +193,7 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
             <div>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-wide text-neutral-500">
                 <div className="flex overflow-hidden rounded-hc border border-neutral-300 normal-case tracking-normal">
-                  <button onClick={() => setHtmlSource("audited")} disabled={!audited} className={`px-2 py-1 ${htmlSource === "audited" ? "bg-neutral-900 text-white" : "hover:bg-neutral-50"} disabled:opacity-50`}>
+                  <button onClick={() => setHtmlSource("audited")} className={`px-2 py-1 ${htmlSource === "audited" ? "bg-neutral-900 text-white" : "hover:bg-neutral-50"} disabled:opacity-50`}>
                     Audited HTML
                   </button>
                   <button onClick={() => setHtmlSource("original")} className={`px-2 py-1 ${htmlSource === "original" ? "bg-neutral-900 text-white" : "hover:bg-neutral-50"}`}>
@@ -215,7 +215,7 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
           ) : (
             <>
               <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wide text-neutral-500">
-                <span>{view === "audited" ? "Audited page (accepted changes applied)" : "Original post content"}</span>
+                <span>{view === "audited" ? (audited ? "Audited page (accepted changes applied)" : "Audited page (no audit yet, only the age warning if enabled)") : "Original post content"}</span>
                 {audited && view === "audited" && <span className="text-success-700">{decided}/{issues.length} decided</span>}
               </div>
               <div className="post-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} />

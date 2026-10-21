@@ -30,6 +30,7 @@ GUARDRAILS
 - Never invent facts, numbers, versions or claims. AEO rewrites keep the meaning of the source.
 - Keep iframes, images, demo embeds and code examples intact unless the issue is specifically about them.
 - Keep "suggested_content_html" as valid HTML in the same style as the input (plain WordPress HTML: p, h2, h3, ul, ol, pre, code, a, img, iframe, table). Apply all your issues to it. If nothing should change, return the original unchanged.
+- Put structured data ONLY in "aeo.schema_jsonld" (never as an issue), the FAQ block ONLY in "aeo.faq" (never as an issue), and the lead paragraph ONLY in "aeo.lead_answer" (never as an issue); the tool turns each of those into its own card.
 - Limit to the 12 most valuable issues. Prefer major AEO and correctness findings over nitpicks; the deterministic layer already catches missing alt text, dead links, pinned CDN versions and heading-level skips, so do not repeat those.
 
 OUTPUT (strict JSON)
@@ -239,8 +240,16 @@ export function reviewToIssues(review: LlmReview, html: string): NewIssue[] {
     });
   }
 
+  // Drop model issues that carry no actionable snippet when a derived card covers them (e.g. "add schema" with null snippet).
+  for (let i = out.length - 1; i >= 0; i--) {
+    const o = out[i];
+    if (o.category === "schema" && !o.suggested_snippet) out.splice(i, 1);
+  }
+
   const aeo = review.aeo;
-  const hasLeadIssue = out.some((o) => o.category === "aeo" && o.apply_mode === "prepend");
+  const titleOrSnippet = (o: NewIssue) => `${o.title} ${o.suggested_snippet ?? ""}`;
+  const hasLeadIssue = out.some((o) => o.category === "aeo" && (o.apply_mode === "prepend" || /lead|answer-first|short answer|tl;dr/i.test(titleOrSnippet(o))));
+  const hasFaqIssue = out.some((o) => o.category === "aeo" && /frequently asked|faq/i.test(titleOrSnippet(o)));
   if (aeo.lead_answer && !hasLeadIssue) {
     out.push({
       source: "llm",
@@ -254,7 +263,7 @@ export function reviewToIssues(review: LlmReview, html: string): NewIssue[] {
       apply_mode: "prepend",
     });
   }
-  if (aeo.faq?.length) {
+  if (aeo.faq?.length && !hasFaqIssue) {
     const faqHtml = ["<h2>Frequently asked questions</h2>", ...aeo.faq.map((f) => `<h3>${f.q}</h3>\n<p>${f.a}</p>`)].join("\n");
     out.push({
       source: "llm",

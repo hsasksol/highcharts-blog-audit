@@ -35,6 +35,7 @@ GUARDRAILS
 - Code blocks on this blog use one fixed format: <div class="hs-code-outer-container"><div class="hs-code-container neutral-50-light neutral-800-dark" tabindex="0" role="region" aria-label="Code block"><pre class="wp-block-code"><code>…escaped code…</code></pre>[copy button]</div></div>. The deterministic layer already converts non-standard <pre> blocks to it, so do not report that; never add language-* classes, never strip the wrapper or the copy button in your rewrite, and when you write new code examples in "suggested_content_html" use plain <pre class="wp-block-code"><code>…</code></pre> (the tool wraps it). Do flag code that is pasted as paragraphs, inline code that should be a block, and broken or outdated code.
 - Keep "suggested_content_html" as valid HTML in the same style as the input (plain WordPress HTML: p, h2, h3, ul, ol, pre, code, a, img, iframe, table). Apply all your issues to it. If nothing should change, return the original unchanged.
 - Put structured data ONLY in "aeo.schema_jsonld" (never as an issue), the FAQ block ONLY in "aeo.faq" (never as an issue), and the lead paragraph ONLY in "aeo.lead_answer" (never as an issue); the tool turns each of those into its own card.
+- LONG POSTS: if the body HTML is longer than about 25,000 characters, do NOT produce a full rewrite: return "suggested_content_html" as an empty string and rely on precise snippet-level issues instead. The tool then offers only the snippet cards.
 - Limit to the 12 most valuable issues. Prefer major AEO and correctness findings over nitpicks; the deterministic layer already catches missing alt text, dead links, pinned CDN versions and heading-level skips, so do not repeat those.
 
 OUTPUT (strict JSON)
@@ -168,6 +169,7 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
     `Category: ${post.category ?? "unknown"}`,
     `Published: ${post.published_at?.slice(0, 10) ?? "unknown"}  Last modified: ${post.modified_at?.slice(0, 10) ?? "unknown"}`,
     `Today: ${new Date().toISOString().slice(0, 10)}`,
+    `Body HTML length: ${post.original_html.length} characters${post.original_html.length > 25000 ? " (LONG POST: return suggested_content_html as an empty string)" : ""}`,
     "",
     "EXISTING JSON-LD ON THE LIVE PAGE (already present, do not duplicate; propose only complementary nodes):",
     JSON.stringify(summarizeJsonLd(post.existing_jsonld ?? []), null, 1),
@@ -180,7 +182,7 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
   const res = await client.messages
     .stream({
       model: MODEL,
-      max_tokens: 32000,
+      max_tokens: 96000,
       system: SYSTEM,
       messages: [{ role: "user", content: user }],
       output_config: { format: { type: "json_schema", schema: REVIEW_SCHEMA } },
@@ -191,13 +193,13 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n");
+  if (res.stop_reason === "max_tokens") throw new Error("Editorial review was cut off (max_tokens): the post is too long for a full rewrite. Re-run the audit; long posts get snippet-level suggestions only.");
   const review = parseReview(text);
-  if (res.stop_reason === "max_tokens") throw new Error("Editorial review was cut off (max_tokens). Try again or shorten the post.");
   review.issues = Array.isArray(review.issues) ? review.issues : [];
   review.aeo = review.aeo ?? { lead_answer: null, suggested_headings: [], faq: [], schema_jsonld: null };
   review.aeo.suggested_headings = review.aeo.suggested_headings ?? [];
   review.aeo.faq = review.aeo.faq ?? [];
-  if (!review.suggested_content_html) review.suggested_content_html = post.original_html;
+  if (!review.suggested_content_html || review.suggested_content_html.trim().length < 200) review.suggested_content_html = post.original_html;
   return review;
 }
 

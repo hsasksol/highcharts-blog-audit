@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { db } from "@/lib/supabase";
+import { fetchIssuesForPosts } from "@/lib/issues-query";
 import { COOKIE, verifyReportToken, verifySession } from "@/lib/auth";
 import { ReportTable, type ReportRow } from "@/components/ReportTable";
 
@@ -38,7 +39,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
     .order("aeo_score", { ascending: true, nullsFirst: false });
 
   const ids = (posts ?? []).map((p) => p.id);
-  const { data: issueRows } = ids.length ? await db().from("issues").select("post_id, severity, category, title").in("post_id", ids) : { data: [] as { post_id: number; severity: string; category: string; title: string }[] };
+  const issueRows = (await fetchIssuesForPosts(ids, "post_id, severity, category, title")) as { post_id: number; severity: string; category: string; title: string }[];
   const agg = new Map<number, { total: number; major: number; dead: number; code: number; top: string[] }>();
   const rank: Record<string, number> = { blocker: 0, major: 1, minor: 2, info: 3 };
   for (const r of issueRows ?? []) {

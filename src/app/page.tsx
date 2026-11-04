@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/supabase";
+import { fetchIssuesForPosts } from "@/lib/issues-query";
 import type { Post, PostState } from "@/lib/types";
 import { AeoScore, SeverityBadge, StateBadge } from "@/components/Badges";
 import { Toolbar } from "@/components/Toolbar";
@@ -51,9 +52,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
     total = count ?? 0;
 
     const ids = (data ?? []).map((p) => p.id);
-    const { data: issueRows } = ids.length
-      ? await db().from("issues").select("post_id, decision").in("post_id", ids)
-      : { data: [] as { post_id: number; decision: string }[] };
+    const issueRows = (await fetchIssuesForPosts(ids, "post_id, decision")) as { post_id: number; decision: string }[];
     const agg = new Map<number, { t: number; d: number }>();
     for (const r of issueRows ?? []) {
       const a = agg.get(r.post_id) ?? { t: 0, d: 0 };

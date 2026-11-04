@@ -11,11 +11,13 @@ interface Search {
   state?: string;
   q?: string;
   sort?: string;
+  all?: string;
 }
 
 /** Neighbours in the same filtered, sorted list as the overview, so prev/next walks the queue. */
 async function neighbours(post: Post, sp: Search): Promise<{ prev: number | null; next: number | null; position: number; total: number }> {
   let q = db().from("posts").select("id, published_at, aeo_score");
+  if (!sp.all && !post.excluded) q = q.eq("excluded", false);
   if (sp.author) q = q.eq("author_slug", sp.author);
   if (sp.state) q = q.eq("state", sp.state as PostState);
   if (sp.q) q = q.ilike("title", `%${sp.q}%`);

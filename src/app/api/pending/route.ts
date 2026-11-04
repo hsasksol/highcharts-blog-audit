@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     .from("posts")
     .select("id")
     .in("audit_status", ["pending", "error"])
+    .eq("excluded", false)
     .order("published_at", { ascending: false })
     .limit(limit);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

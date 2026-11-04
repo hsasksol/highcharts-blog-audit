@@ -188,6 +188,16 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
           </button>
         </div>
       </div>
+      {post.excluded && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-hc border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+          <span>
+            <span className="font-semibold">Excluded from audit.</span> {post.excluded_reason ?? "Time-bound content."} You can still run an audit manually.
+          </span>
+          <button onClick={() => patchPost({ excluded: false }).catch((e) => setMsg(String(e)))} className="rounded-hc border border-neutral-300 bg-white px-2 py-1 text-xs font-medium hover:bg-neutral-100">
+            Include in audit queue
+          </button>
+        </div>
+      )}
       <Steps current={currentStep} done={stepDone} />
       {msg && <div className="rounded-hc border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700">{msg}</div>}
 

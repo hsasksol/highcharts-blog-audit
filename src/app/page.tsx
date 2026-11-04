@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 const STATES: PostState[] = ["pending", "in-review", "approved", "needs-changes", "rejected"];
 
-type Row = Pick<Post, "id" | "title" | "author_name" | "author_slug" | "category" | "published_at" | "audit_status" | "overall_severity" | "aeo_score" | "state" | "age_warning"> & {
+type Row = Pick<Post, "id" | "title" | "author_name" | "author_slug" | "category" | "published_at" | "audit_status" | "overall_severity" | "aeo_score" | "state" | "age_warning" | "excluded"> & {
   issues_total: number;
   issues_decided: number;
 };
@@ -20,6 +20,7 @@ interface Search {
   q?: string;
   page?: string;
   sort?: string;
+  all?: string;
 }
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
@@ -31,13 +32,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   let rows: Row[] = [];
   let total = 0;
   let authors: { slug: string; name: string; count: number }[] = [];
-  let stats = { total: 0, audited: 0, approved: 0, pending: 0 };
+  let stats = { total: 0, audited: 0, approved: 0, pending: 0, excluded: 0 };
   let errorMsg: string | null = null;
 
   try {
     let q = db()
       .from("posts")
-      .select("id, title, author_name, author_slug, category, published_at, audit_status, overall_severity, aeo_score, state, age_warning", { count: "exact" });
+      .select("id, title, author_name, author_slug, category, published_at, audit_status, overall_severity, aeo_score, state, age_warning, excluded", { count: "exact" });
+    if (!sp.all) q = q.eq("excluded", false);
     if (sp.author) q = q.eq("author_slug", sp.author);
     if (sp.state && STATES.includes(sp.state as PostState)) q = q.eq("state", sp.state);
     if (sp.q) q = q.ilike("title", `%${sp.q}%`);
@@ -61,7 +63,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
     }
     rows = (data ?? []).map((p) => ({ ...(p as Omit<Row, "issues_total" | "issues_decided">), issues_total: agg.get(p.id)?.t ?? 0, issues_decided: agg.get(p.id)?.d ?? 0 }));
 
-    const { data: all } = await db().from("posts").select("author_slug, author_name, audit_status, state");
+    const { data: everything } = await db().from("posts").select("author_slug, author_name, audit_status, state, excluded");
+    const excludedCount = everything?.filter((p) => p.excluded).length ?? 0;
+    const all = sp.all ? everything : everything?.filter((p) => !p.excluded);
     const byAuthor = new Map<string, { name: string; count: number }>();
     for (const p of all ?? []) {
       if (!p.author_slug) continue;
@@ -73,6 +77,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       .map(([slug, v]) => ({ slug, ...v }))
       .sort((a, b) => b.count - a.count);
     stats = {
+      excluded: excludedCount,
       total: all?.length ?? 0,
       audited: all?.filter((p) => p.audit_status === "audited").length ?? 0,
       approved: all?.filter((p) => p.state === "approved").length ?? 0,
@@ -99,6 +104,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           <h1 className="text-2xl font-bold">Posts</h1>
           <p className="text-sm text-neutral-500">
             {stats.total} posts · {stats.audited} audited · {stats.approved} approved · {stats.pending} not yet audited
+            {stats.excluded > 0 && <span className="text-neutral-400"> · {stats.excluded} news/updates/webinars {sp.all ? "shown" : "hidden"}</span>}
           </p>
         </div>
         <Toolbar pendingCount={stats.pending} />
@@ -137,8 +143,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           <option value="aeo">Lowest AEO score first</option>
         </select>
         <input name="q" defaultValue={sp.q ?? ""} placeholder="Search title" className="w-56 rounded-hc border border-neutral-300 px-2 py-1" />
+        <label className="flex items-center gap-1 text-neutral-600">
+          <input type="checkbox" name="all" value="1" defaultChecked={!!sp.all} /> Include news, product updates, webinars
+        </label>
         <button className="rounded-hc bg-neutral-900 px-3 py-1 text-white">Filter</button>
-        {(sp.author || sp.state || sp.q || sp.sort) && (
+        {(sp.author || sp.state || sp.q || sp.sort || sp.all) && (
           <Link href="/" className="text-neutral-500 underline">
             Clear
           </Link>
@@ -174,6 +183,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
                     {p.title}
                   </Link>
                   {p.age_warning && <span className="ml-2 rounded-hc bg-attention-100 px-1 text-[10px] font-semibold text-attention-800">AGE WARNING</span>}
+                  {p.excluded && <span className="ml-2 rounded-hc bg-neutral-100 px-1 text-[10px] font-semibold text-neutral-500" title="Not audited: time-bound content">EXCLUDED</span>}
                 </td>
                 <td className="px-3 py-2 text-neutral-700">{p.author_name ?? "—"}</td>
                 <td className="px-3 py-2 text-neutral-500">{p.category ?? "—"}</td>

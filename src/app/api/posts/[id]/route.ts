@@ -19,6 +19,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const body = (await req.json().catch(() => ({}))) as {
     age_warning?: boolean;
     age_warning_text?: string;
+    excluded?: boolean;
     state_override?: PostState | null;
     bulk?: "accept-all" | "reject-all" | "reopen-all" | "revert-original";
     actor?: string;
@@ -26,6 +27,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const patch: Record<string, unknown> = {};
   if (typeof body.age_warning === "boolean") patch.age_warning = body.age_warning;
+  if (typeof body.excluded === "boolean") {
+    patch.excluded = body.excluded;
+    patch.excluded_reason = body.excluded ? "Excluded manually" : null;
+  }
   if (typeof body.age_warning_text === "string") patch.age_warning_text = body.age_warning_text;
   if (body.state_override === null) patch.state_override = null;
   else if (body.state_override && STATES.includes(body.state_override)) patch.state_override = body.state_override;

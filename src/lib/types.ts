@@ -64,6 +64,8 @@ export interface Post {
   original_html: string;
   original_text: string | null;
   existing_jsonld: Record<string, unknown>[] | null;
+  excluded: boolean;
+  excluded_reason: string | null;
   fetched_at: string;
   audit_status: AuditStatus;
   audit_error: string | null;

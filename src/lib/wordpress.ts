@@ -107,6 +107,15 @@ export async function fetchDisplayAuthor(pageUrl: string): Promise<string | null
   return (await fetchPageMeta(pageUrl)).author;
 }
 
+/** Time-bound content that is not worth auditing for AEO: news, product updates, webinar recaps. */
+export const EXCLUDED_CATEGORIES = ["News", "Product Updates", "Webinars"];
+export function exclusionReason(category: string | null, url: string): string | null {
+  const byCat = category && EXCLUDED_CATEGORIES.includes(category);
+  const bySection = /\/blog\/(news|product-updates|webinars)\//.test(url);
+  if (!byCat && !bySection) return null;
+  return `Time-bound content (${category ?? "news"}): news, product updates and webinar recaps are not audited for AEO`;
+}
+
 export function decodeEntities(s: string): string {
   return cheerio.load(`<x>${s}</x>`)("x").text();
 }
@@ -118,6 +127,8 @@ export function htmlToText(html: string): string {
 }
 
 export interface NormalizedPost {
+  excluded: boolean;
+  excluded_reason: string | null;
   id: number;
   url: string;
   slug: string;
@@ -140,7 +151,10 @@ export function normalizeWpPost(raw: WpPostRaw, displayAuthor: string | null): N
   const authorTerm = terms.find((t) => t.taxonomy === "author");
   const html = raw.content.rendered.trim();
   const text = htmlToText(html);
+  const reason = exclusionReason(category, raw.link);
   return {
+    excluded: reason !== null,
+    excluded_reason: reason,
     id: raw.id,
     url: raw.link,
     slug: raw.slug,

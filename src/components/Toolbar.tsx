@@ -9,6 +9,8 @@ export function Toolbar({ pendingCount }: { pendingCount: number }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [log, setLog] = useState<string>("");
   const [batch, setBatch] = useState(10);
+  const [full, setFull] = useState(false);
+  const PARALLEL = 4;
 
   async function sync() {
     setBusy("sync");
@@ -59,15 +61,28 @@ export function Toolbar({ pendingCount }: { pendingCount: number }) {
         return;
       }
       let done = 0;
-      for (const id of ids) {
-        setLog(`Auditing ${done + 1}/${ids.length} (post ${id})…`);
-        const r = await fetch(`/api/audit/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-        const d = await r.json();
-        if (!r.ok) setLog(`Post ${id} failed: ${d.error}`);
-        done += 1;
-        router.refresh();
-      }
-      setLog(`Audited ${done} posts.`);
+      let failed = 0;
+      let next = 0;
+      const t0 = Date.now();
+      await Promise.all(
+        Array.from({ length: Math.min(PARALLEL, ids.length) }, async () => {
+          while (next < ids.length) {
+            const id = ids[next++];
+            try {
+              const r = await fetch(`/api/audit/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fast: !full }) });
+              const d = await r.json().catch(() => ({}));
+              if (!r.ok) failed += 1;
+              if (!r.ok) console.warn(`Post ${id} failed: ${d.error}`);
+            } catch {
+              failed += 1;
+            }
+            done += 1;
+            setLog(`Audited ${done}/${ids.length}${failed ? ` (${failed} failed)` : ""} · ${Math.round((Date.now() - t0) / 1000)}s`);
+            router.refresh();
+          }
+        })
+      );
+      setLog(`Audited ${done} posts${failed ? `, ${failed} failed (re-run “Audit next” to retry)` : ""} in ${Math.round((Date.now() - t0) / 1000)}s.`);
     } catch (e) {
       setLog(`Audit failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -85,7 +100,10 @@ export function Toolbar({ pendingCount }: { pendingCount: number }) {
         <button onClick={auditNext} disabled={!!busy || pendingCount === 0} className="rounded-hc bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
           {busy === "audit" ? "Auditing…" : "Audit next"}
         </button>
-        <input type="number" min={1} max={100} value={batch} onChange={(e) => setBatch(Math.max(1, Number(e.target.value)))} className="w-16 rounded-hc border border-neutral-300 px-2 py-1.5" />
+        <input type="number" min={1} max={200} value={batch} onChange={(e) => setBatch(Math.max(1, Number(e.target.value)))} className="w-16 rounded-hc border border-neutral-300 px-2 py-1.5" />
+        <label className="ml-1 flex items-center gap-1 text-xs text-neutral-600" title="Slower: also generates a complete rewritten version of each post">
+          <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Full rewrite
+        </label>
       </div>
       {log && <span className="text-neutral-500">{log}</span>}
     </div>

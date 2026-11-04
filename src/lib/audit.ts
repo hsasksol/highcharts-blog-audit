@@ -13,15 +13,22 @@ export function isOlderThanFiveYears(publishedAt: string | null): boolean {
 }
 
 /** Run Layer 1 + Layer 2 for one post and replace its issues. Preserves nothing: re-auditing resets decisions. */
-export async function auditPost(postId: number, opts: { llm?: boolean } = {}): Promise<{ issues: number }> {
+export interface AuditOptions {
+  llm?: boolean;
+  /** Fast mode (default true): no full rewrite, link check via shared cache. Full mode adds the complete rewrite card. */
+  fast?: boolean;
+}
+
+export async function auditPost(postId: number, opts: AuditOptions = {}): Promise<{ issues: number }> {
   const useLlm = opts.llm ?? true;
+  const fast = opts.fast ?? true;
   const { data: post, error } = await db().from("posts").select("*").eq("id", postId).single<Post>();
   if (error || !post) throw new Error(error?.message ?? "Post not found");
 
   await db().from("posts").update({ audit_status: "running", audit_error: null }).eq("id", postId);
 
   try {
-    const ruleIssues = await runRules(post.original_html);
+    const ruleIssues = await runRules(post.original_html, { links: true });
     let llmIssues: NewIssue[] = [];
     let patch: Partial<Post> = {};
 
@@ -31,14 +38,17 @@ export async function auditPost(postId: number, opts: { llm?: boolean } = {}): P
         post.existing_jsonld = meta.jsonld;
         await db().from("posts").update({ existing_jsonld: meta.jsonld }).eq("id", postId);
       }
-      const review = await reviewPost(post);
+      const review = await reviewPost(post, { fast });
       llmIssues = reviewToIssues(review, post.original_html);
       patch = {
         summary: review.summary ?? null,
         overall_severity: review.overall_severity ?? null,
         historical: Boolean(review.historical),
         aeo_score: Number.isFinite(review.aeo_score) ? Math.max(0, Math.min(100, Math.round(review.aeo_score))) : null,
-        suggested_html: review.suggested_content_html ? normalizeCodeBlocks(ensureBoilerplate(post.original_html, review.suggested_content_html)) : null,
+        suggested_html:
+          review.suggested_content_html && review.suggested_content_html.trim() !== post.original_html.trim()
+            ? normalizeCodeBlocks(ensureBoilerplate(post.original_html, review.suggested_content_html))
+            : null,
         aeo: review.aeo ?? null,
       };
     }

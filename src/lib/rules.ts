@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
 import type { NewIssue } from "./types";
+import { checkLinks } from "./links";
 
 /**
  * Layer 1: deterministic rules. Pure functions over the post's own content HTML
@@ -136,25 +137,7 @@ const insecureLinks: Rule = (html, $) => {
   return out;
 };
 
-const LINK_TIMEOUT_MS = 6000;
 const LINK_LIMIT = 60;
-
-async function probe(url: string): Promise<{ ok: boolean; status: number | "error"; finalUrl: string }> {
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), LINK_TIMEOUT_MS);
-  const headers = { "User-Agent": "Mozilla/5.0 (compatible; highcharts-blog-audit/1.0)" };
-  try {
-    let res = await fetch(url, { method: "HEAD", redirect: "follow", signal: ctl.signal, headers });
-    if (res.status === 405 || res.status === 403 || res.status === 404) {
-      res = await fetch(url, { method: "GET", redirect: "follow", signal: ctl.signal, headers });
-    }
-    return { ok: res.ok, status: res.status, finalUrl: res.url };
-  } catch {
-    return { ok: false, status: "error", finalUrl: url };
-  } finally {
-    clearTimeout(t);
-  }
-}
 
 const brokenLinks: Rule = async (html, $) => {
   const urls = new Map<string, string>(); // href -> link text
@@ -164,30 +147,24 @@ const brokenLinks: Rule = async (html, $) => {
     if (!urls.has(href)) urls.set(href, $(el).text().trim());
   });
   const list = Array.from(urls.entries()).slice(0, LINK_LIMIT);
+  const results = await checkLinks(list.map(([href]) => href));
   const out: NewIssue[] = [];
-  const workers = 8;
-  let i = 0;
-  await Promise.all(
-    Array.from({ length: workers }, async () => {
-      while (i < list.length) {
-        const [href, text] = list[i++];
-        const r = await probe(href);
-        if (r.ok) continue;
-        if (r.status === 403 || r.status === 429) continue; // bot-blocked, not provably dead
-        out.push(
-          issue({
-            axis: 1,
-            category: "broken-link",
-            severity: r.status === "error" ? "minor" : "major",
-            title: `Dead link (${r.status}): ${shorten(href)}`,
-            description: `The link "${text || href}" returns ${r.status}. Replace it with a working destination or remove the link.`,
-            original_snippet: href,
-            suggested_snippet: null,
-          })
-        );
-      }
-    })
-  );
+  for (const [href, text] of list) {
+    const r = results.get(href);
+    if (!r || r.ok) continue;
+    if (r.status === 403 || r.status === 429) continue; // bot-blocked, not provably dead
+    out.push(
+      issue({
+        axis: 1,
+        category: "broken-link",
+        severity: r.status === "error" ? "minor" : "major",
+        title: `Dead link (${r.status}): ${shorten(href)}`,
+        description: `The link "${text || href}" returns ${r.status}. Replace it with a working destination or remove the link.`,
+        original_snippet: href,
+        suggested_snippet: null,
+      })
+    );
+  }
   return out;
 };
 
@@ -448,9 +425,10 @@ const emptyParagraphs: Rule = (html, $) => {
 
 const RULES: Rule[] = [deprecatedApi, pinnedCdn, insecureLinks, brokenLinks, codeBlocks, headingHierarchy, imagesAlt, tablesHeaders, linkText, emptyParagraphs];
 
-export async function runRules(html: string): Promise<NewIssue[]> {
+export async function runRules(html: string, opts: { links?: boolean } = {}): Promise<NewIssue[]> {
   const $ = loadHtml(html);
-  const results = await Promise.all(RULES.map((r) => r(html, $)));
+  const rules = opts.links === false ? RULES.filter((r) => r !== brokenLinks) : RULES;
+  const results = await Promise.all(rules.map((r) => r(html, $)));
   return results.flat();
 }
 

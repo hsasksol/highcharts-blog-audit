@@ -155,7 +155,12 @@ export function parseReview(text: string): LlmReview {
   throw new Error(`LLM returned non-JSON output: ${(lastErr as Error)?.message ?? "parse failed"}`);
 }
 
-export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name" | "category" | "published_at" | "modified_at" | "original_html" | "existing_jsonld">): Promise<LlmReview> {
+export interface ReviewOptions {
+  /** Fast mode: no full rewrite, fewer issues. Snippet-level findings and AEO artifacts are unchanged. */
+  fast?: boolean;
+}
+
+export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name" | "category" | "published_at" | "modified_at" | "original_html" | "existing_jsonld">, opts: ReviewOptions = {}): Promise<LlmReview> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
   // Keys that are not scoped to a workspace must send the workspace ID on every request.
@@ -169,7 +174,8 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
     `Category: ${post.category ?? "unknown"}`,
     `Published: ${post.published_at?.slice(0, 10) ?? "unknown"}  Last modified: ${post.modified_at?.slice(0, 10) ?? "unknown"}`,
     `Today: ${new Date().toISOString().slice(0, 10)}`,
-    `Body HTML length: ${post.original_html.length} characters${post.original_html.length > 25000 ? " (LONG POST: return suggested_content_html as an empty string)" : ""}`,
+    `Body HTML length: ${post.original_html.length} characters${post.original_html.length > 25000 || opts.fast ? " (return suggested_content_html as an empty string: no full rewrite in this run)" : ""}`,
+    opts.fast ? "FAST MODE: do not write a full rewrite. Report at most 10 issues, each with exact original_snippet and suggested_snippet. Keep the FAQ to 3-4 questions." : "",
     "",
     "EXISTING JSON-LD ON THE LIVE PAGE (already present, do not duplicate; propose only complementary nodes):",
     JSON.stringify(summarizeJsonLd(post.existing_jsonld ?? []), null, 1),
@@ -182,7 +188,7 @@ export async function reviewPost(post: Pick<Post, "title" | "url" | "author_name
   const res = await client.messages
     .stream({
       model: MODEL,
-      max_tokens: 96000,
+      max_tokens: opts.fast ? 16000 : 96000,
       system: SYSTEM,
       messages: [{ role: "user", content: user }],
       output_config: { format: { type: "json_schema", schema: REVIEW_SCHEMA } },

@@ -100,11 +100,11 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
     }
   }
 
-  async function runAudit() {
+  async function runAudit(full = false) {
     setBusy("audit");
-    setMsg("Running rules + editorial review…");
+    setMsg(full ? "Running rules + editorial review with full rewrite (1-3 min)…" : "Running rules + editorial review…");
     try {
-      const res = await fetch(`/api/audit/${post.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const res = await fetch(`/api/audit/${post.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fast: !full }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? res.statusText);
       setMsg(`Audit done: ${data.issues} issues.`);
@@ -183,8 +183,11 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
           <button onClick={() => copyHtml("audited")} title="Step 4: paste this into the WordPress code editor" className="rounded-hc border border-success-600 bg-success-600 px-3 py-1.5 font-medium text-white hover:bg-success-700 disabled:opacity-50">
             Copy audited HTML
           </button>
-          <button onClick={runAudit} disabled={!!busy} title="Step 1" className="rounded-hc bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          <button onClick={() => runAudit(false)} disabled={!!busy} title="Step 1" className="rounded-hc bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
             {busy === "audit" ? "Auditing…" : audited ? "Re-run audit" : "Run audit"}
+          </button>
+          <button onClick={() => runAudit(true)} disabled={!!busy} title="Slower: also generates a complete rewritten version" className="rounded-hc border border-brand-300 bg-white px-3 py-1.5 text-sm font-medium text-brand-800 hover:bg-brand-50 disabled:opacity-50">
+            + full rewrite
           </button>
         </div>
       </div>

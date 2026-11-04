@@ -43,3 +43,14 @@ export function cookieHeader(token: string, maxAge: number): string {
   const prod = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
   return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${prod ? "; Secure" : ""}`;
 }
+
+/** True when the report-only cookie is valid. */
+export async function verifyReportToken(token: string | undefined): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const { payload } = await jwtVerify(token, secret());
+    return payload.r === "report";
+  } catch {
+    return false;
+  }
+}

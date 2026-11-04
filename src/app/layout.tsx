@@ -8,6 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Highcharts blog audit",
   description: "Content + AEO audit of highcharts.com/blog",
+  icons: { icon: "/icon.svg" },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -19,8 +20,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div className="mx-auto flex max-w-[1600px] items-center gap-6 px-6 py-3">
             <Link href="/" className="flex items-center gap-2 text-base font-bold tracking-tight text-neutral-900">
               <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
-                <path d="M4 26 L13 12 L19 19 L28 5" fill="none" stroke="#626bd0" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M4 26 L13 18 L19 23 L28 13" fill="none" stroke="#2ee0ca" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
+                <path d="M20 5.5 L26.5 12 L12 26.5 L5.5 20 Z" fill="#626bd0" />
+                <path d="M23.2 2.3 a2.3 2.3 0 0 1 3.2 0 l3.3 3.3 a2.3 2.3 0 0 1 0 3.2 L26.5 12 L20 5.5 Z" fill="#2ee0ca" />
+                <path d="M5.5 20 L12 26.5 L3.5 28.5 Z" fill="#151733" />
+                <path d="M9.5 24.5 L22.5 11.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.85" />
               </svg>
               Highcharts blog audit
             </Link>

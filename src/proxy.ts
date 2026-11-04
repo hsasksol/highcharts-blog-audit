@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { COOKIE, verifySession } from "@/lib/auth";
+import { COOKIE, verifyReportToken, verifySession } from "@/lib/auth";
 
 /**
  * Login gate: one shared username + password (APP_USERNAME / APP_PASSWORD), signed HttpOnly
@@ -7,9 +7,13 @@ import { COOKIE, verifySession } from "@/lib/auth";
  */
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname === "/api/login" || pathname === "/report") return NextResponse.next();
+  if (pathname === "/api/login" || pathname === "/api/report-login") return NextResponse.next();
 
   const user = await verifySession(req.cookies.get(COOKIE)?.value).catch(() => null);
+  if (pathname === "/report") {
+    // The report page renders its own password form when neither cookie is valid.
+    return NextResponse.next();
+  }
   if (pathname === "/login") {
     // Already signed in: never show the login form, go straight to the app (or ?next=).
     if (!user) return NextResponse.next();

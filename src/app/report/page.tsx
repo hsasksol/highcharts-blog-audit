@@ -1,10 +1,35 @@
+import { cookies } from "next/headers";
 import { db } from "@/lib/supabase";
+import { COOKIE, verifyReportToken, verifySession } from "@/lib/auth";
 import { ReportTable, type ReportRow } from "@/components/ReportTable";
 
 export const dynamic = "force-dynamic";
 
-/** Public read-only report (no login): one row per audited post with the key findings. */
-export default async function ReportPage() {
+function PasswordGate({ error }: { error?: string }) {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <form method="post" action="/api/report-login" className="w-full max-w-sm space-y-4 rounded-hc border border-neutral-100 bg-white p-6 shadow-sm">
+        <div>
+          <h1 className="text-xl font-bold">Blog audit report</h1>
+          <p className="text-sm text-neutral-500">Enter the report password.</p>
+        </div>
+        <label className="block text-sm">
+          <span className="font-medium">Password</span>
+          <input name="password" type="password" required autoFocus className="mt-1 w-full rounded-hc border border-neutral-200 px-3 py-2" />
+        </label>
+        {error && <p className="text-sm text-danger-700">{error}</p>}
+        <button className="w-full rounded-hc bg-brand-600 px-3 py-2 font-medium text-white hover:bg-brand-500">Open report</button>
+      </form>
+    </div>
+  );
+}
+
+/** Read-only report behind a separate password (or the normal login): one row per audited post with the key findings. */
+export default async function ReportPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const jar = await cookies();
+  const [user, reportOk] = await Promise.all([verifySession(jar.get(COOKIE)?.value).catch(() => null), verifyReportToken(jar.get("hc_report")?.value).catch(() => false)]);
+  if (!user && !reportOk) return <PasswordGate error={(await searchParams).error} />;
+
   const { data: posts } = await db()
     .from("posts")
     .select("id, title, url, author_name, author_slug, category, published_at, overall_severity, aeo_score, summary, historical, state, audit_status, excluded")

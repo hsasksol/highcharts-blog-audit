@@ -28,6 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <>
                 <nav className="flex gap-4 text-sm text-neutral-600">
                   <Link href="/" className="hover:text-brand-700">Posts</Link>
+                  <Link href="/report" className="hover:text-neutral-900">Report</Link>
                   <a href="/api/export?state=approved" className="hover:text-neutral-900" target="_blank" rel="noreferrer">Export approved</a>
                 </nav>
                 <div className="ml-auto flex items-center gap-3 text-sm text-neutral-500">

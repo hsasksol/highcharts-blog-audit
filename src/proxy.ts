@@ -7,7 +7,7 @@ import { COOKIE, verifySession } from "@/lib/auth";
  */
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname === "/api/login") return NextResponse.next();
+  if (pathname === "/api/login" || pathname === "/report") return NextResponse.next();
 
   const user = await verifySession(req.cookies.get(COOKIE)?.value).catch(() => null);
   if (pathname === "/login") {

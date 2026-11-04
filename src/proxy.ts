@@ -7,9 +7,18 @@ import { COOKIE, verifySession } from "@/lib/auth";
  */
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname === "/login" || pathname === "/api/login") return NextResponse.next();
+  if (pathname === "/api/login") return NextResponse.next();
 
   const user = await verifySession(req.cookies.get(COOKIE)?.value).catch(() => null);
+  if (pathname === "/login") {
+    // Already signed in: never show the login form, go straight to the app (or ?next=).
+    if (!user) return NextResponse.next();
+    const url = req.nextUrl.clone();
+    const next = req.nextUrl.searchParams.get("next");
+    url.pathname = next && next.startsWith("/") && !next.startsWith("/login") ? next.split("?")[0] : "/";
+    url.search = next && next.includes("?") ? `?${next.split("?")[1]}` : "";
+    return NextResponse.redirect(url);
+  }
   if (user) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

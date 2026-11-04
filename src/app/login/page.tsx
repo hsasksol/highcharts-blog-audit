@@ -1,10 +1,9 @@
 "use client";
 
 import { FormEvent, Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -20,8 +19,8 @@ function LoginForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Login failed");
       const next = params.get("next");
-      router.replace(next && next.startsWith("/") ? next : "/");
-      router.refresh();
+      // Full navigation (not the client router) so no cached redirect or stale page is reused.
+      window.location.assign(next && next.startsWith("/") && !next.startsWith("/login") ? next : "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

@@ -7,7 +7,7 @@ import { COOKIE, verifyReportToken, verifySession } from "@/lib/auth";
  */
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname === "/api/login" || pathname === "/api/report-login" || pathname.startsWith("/api/plan/") || pathname === "/api/gsc-snapshot") return NextResponse.next(); // plan endpoint checks its own bearer token
+  if (pathname === "/api/login" || pathname === "/api/report-login" || pathname.startsWith("/api/plan/") || pathname === "/api/gsc-snapshot" || pathname === "/api/wp-raw") return NextResponse.next(); // plan endpoint checks its own bearer token
 
   const user = await verifySession(req.cookies.get(COOKIE)?.value).catch(() => null);
   if (pathname === "/report") {

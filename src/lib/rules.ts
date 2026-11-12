@@ -175,7 +175,7 @@ export const COPY_BUTTON_HTML =
 export function wrapCodeBlock(innerCodeHtml: string): string {
   return (
     '<div class="hs-code-outer-container"><div class="hs-code-container neutral-50-light neutral-800-dark" tabindex="0" role="region" aria-label="Code block">\n' +
-    `<pre class="wp-block-code"><code>${innerCodeHtml}</code></pre>\n` +
+    `<pre class="wp-block-code" style="margin-top:var(--wp--preset--spacing--30);margin-bottom:var(--wp--preset--spacing--30)"><code>${innerCodeHtml}</code></pre>\n` +
     COPY_BUTTON_HTML +
     "\n</div></div>"
   );

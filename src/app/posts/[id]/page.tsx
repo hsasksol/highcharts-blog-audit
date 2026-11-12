@@ -3,6 +3,7 @@ import { db } from "@/lib/supabase";
 import type { Issue, Post, PostState } from "@/lib/types";
 import { AuditView } from "@/components/AuditView";
 import { isOlderThanFiveYears } from "@/lib/audit";
+import { toBlockHtml } from "@/lib/blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -44,5 +45,5 @@ export default async function PostPage({ params, searchParams }: { params: Promi
   const nav = await neighbours(post, sp);
   const query = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
 
-  return <AuditView post={post} issues={issues ?? []} nav={nav} query={query} suggestAgeWarning={isOlderThanFiveYears(post.published_at)} />;
+  return <AuditView post={post} issues={issues ?? []} nav={nav} query={query} suggestAgeWarning={isOlderThanFiveYears(post.published_at)} originalBlockHtml={toBlockHtml(post.original_html)} />;
 }

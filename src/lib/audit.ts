@@ -1,6 +1,7 @@
 import { db } from "./supabase";
 import { runRules, normalizeCodeBlocks } from "./rules";
 import { ensureBoilerplate, touchesBoilerplate } from "./boilerplate";
+import { toBlockHtml } from "./blocks";
 import { reviewPost, reviewToIssues } from "./llm";
 import { fetchPageMeta } from "./wordpress";
 import { DEFAULT_AGE_WARNING, SEVERITY_RANK, type Issue, type NewIssue, type Post, type PostState, type Severity } from "./types";
@@ -119,7 +120,8 @@ export function assembleFinalHtml(post: Pick<Post, "original_html" | "age_warnin
   if (post.age_warning) {
     html = `${ageWarningHtml(post.age_warning_text ?? DEFAULT_AGE_WARNING)}\n\n${html}`;
   }
-  return html;
+  // The WP REST API strips block comments; add them back so the copied HTML opens as blocks, not classic.
+  return toBlockHtml(html);
 }
 
 export function computeState(issues: Issue[], audited: boolean): PostState {

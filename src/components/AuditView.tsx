@@ -13,11 +13,13 @@ interface Props {
   nav: { prev: number | null; next: number | null; position: number; total: number };
   query: string;
   suggestAgeWarning: boolean;
+  /** Original body with WordPress block comments regenerated (for copying into the block editor). */
+  originalBlockHtml: string;
 }
 
 const STATES: PostState[] = ["pending", "in-review", "approved", "needs-changes", "rejected"];
 
-export function AuditView({ post: initialPost, issues: initialIssues, nav, query, suggestAgeWarning }: Props) {
+export function AuditView({ post: initialPost, issues: initialIssues, nav, query, suggestAgeWarning, originalBlockHtml }: Props) {
   const router = useRouter();
   const [post, setPost] = useState(initialPost);
   const [issues, setIssues] = useState(initialIssues);
@@ -122,7 +124,7 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
   }
 
   async function copyHtml(which: "audited" | "original") {
-    const html = which === "audited" ? (post.final_html ?? post.original_html) : post.original_html;
+    const html = which === "audited" ? (post.final_html ?? originalBlockHtml) : originalBlockHtml;
     try {
       await navigator.clipboard.writeText(html);
       setMsg(`${which === "audited" ? "Audited" : "Original"} HTML copied to clipboard.`);
@@ -224,11 +226,11 @@ export function AuditView({ post: initialPost, issues: initialIssues, nav, query
               </div>
               <textarea
                 readOnly
-                value={htmlSource === "audited" ? (post.final_html ?? post.original_html) : post.original_html}
+                value={htmlSource === "audited" ? (post.final_html ?? originalBlockHtml) : originalBlockHtml}
                 onFocus={(e) => e.currentTarget.select()}
                 className="h-[70vh] w-full resize-y rounded-hc border border-neutral-300 bg-neutral-50 p-3 font-mono text-[12px] leading-5"
               />
-              <p className="mt-2 text-xs text-neutral-500">Paste this into the WordPress code editor for the post. Audited HTML = original + accepted changes{post.age_warning ? " + age warning box" : ""}.</p>
+              <p className="mt-2 text-xs text-neutral-500">Paste this into the WordPress code editor (block editor, “Code editor” view). WordPress block comments (&lt;!-- wp:… --&gt;) are included so the post stays in block mode. Audited HTML = original + accepted changes{post.age_warning ? " + age warning box" : ""}.</p>
             </div>
           ) : (
             <>

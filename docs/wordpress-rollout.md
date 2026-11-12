@@ -26,3 +26,6 @@ Applies to the 33 Highsoft-authored posts that got the AEO changes. Edits are ma
 - `POST/GET /api/gsc-snapshot`: Search Console "Generative AI features" impressions per URL (table `gsc_ai_snapshots`). Baseline 2026-11-12: 445 blog URLs, 93,900 impressions; the 33 posts 54,287.
 - `POST/GET /api/wp-raw`: transfer store for block source (table `wp_raw`), token-protected, not used in the end.
 - `src/lib/blocks.ts` `toBlockHtml`: regenerates WP block comments so copied HTML opens as blocks.
+
+## Embed heights
+Iframe `height` is set to the embed's measured document height at 860 px width plus 15 px (for example streamgraph 811, accessible-pie 649, css/colors 490, dashboards climate 1698). The fallback text inside the old CodePen iframes ("See the Pen ...") was removed.

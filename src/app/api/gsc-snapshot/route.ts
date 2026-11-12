@@ -46,3 +46,20 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500, headers });
   return NextResponse.json({ ok: true, stored: rows.length, captured_on: today }, { headers });
 }
+
+/** GET /api/gsc-snapshot?date=YYYY-MM-DD  (Bearer token) Snapshot rows joined with post metadata. */
+export async function GET(req: NextRequest) {
+  const secret = process.env.JWT_SECRET;
+  try {
+    if (!secret) throw new Error("no secret");
+    const { payload } = await jwtVerify((req.headers.get("authorization") || "").replace(/^Bearer\s+/i, ""), new TextEncoder().encode(secret));
+    if (payload.p !== "plan") throw new Error("scope");
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const date = req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+  const { data: snap, error } = await db().from("gsc_ai_snapshots").select("url, impressions, period_days, captured_on").eq("captured_on", date).order("impressions", { ascending: false }).range(0, 4999);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const { data: posts } = await db().from("posts").select("id, url, title, author_name, category, published_at, aeo_score, overall_severity, excluded").range(0, 999);
+  return NextResponse.json({ date, snapshot: snap ?? [], posts: posts ?? [] });
+}
